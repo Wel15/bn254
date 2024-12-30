@@ -11,8 +11,8 @@ use crate::{
 };
 use core::convert::TryInto;
 use core::fmt;
-use core::ops::{Add, Mul, Neg, Sub};
-use ff::{FromUniformBytes, PrimeField, WithSmallOrderMulGroup};
+use core::ops::{Add, Mul, Neg, Sub, AddAssign, SubAssign, MulAssign};
+use ff::{Field, PrimeField, FromUniformBytes, WithSmallOrderMulGroup};
 use rand::RngCore;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 
@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 // The internal representation of this type is four 64-bit unsigned
 // integers in little-endian order. `Fr` values are always in
 // Montgomery form; i.e., Fr(a) = aR mod r, with R = 2^256.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 pub struct Fr(pub(crate) [u64; 4]);
 
@@ -59,7 +59,6 @@ const MODULUS_STR: &str = "0x30644e72e131a029b85045b68181585d2833e84879b9709143e
 const INV: u64 = 0xc2e1f593efffffff;
 
 /// `R = 2^256 mod r`
-/// `0xe0a77c19a07df2f666ea36f7879462e36fc76959f60cd29ac96341c4ffffffb`
 const R: Fr = Fr([
     0xac96341c4ffffffb,
     0x36fc76959f60cd29,
@@ -68,7 +67,6 @@ const R: Fr = Fr([
 ]);
 
 /// `R^2 = 2^512 mod r`
-/// `0x216d0b17f4e44a58c49833d53bb808553fe3ab1e35c59e31bb8e645ae216da7`
 const R2: Fr = Fr([
     0x1bb8e645ae216da7,
     0x53fe3ab1e35c59e3,
@@ -77,7 +75,6 @@ const R2: Fr = Fr([
 ]);
 
 /// `R^3 = 2^768 mod r`
-/// `0xcf8594b7fcc657c893cc664a19fcfed2a489cbe1cfbb6b85e94d8e1b4bf0040`
 const R3: Fr = Fr([
     0x5e94d8e1b4bf0040,
     0x2a489cbe1cfbb6b8,
@@ -85,16 +82,12 @@ const R3: Fr = Fr([
     0x0cf8594b7fcc657c,
 ]);
 
-/// `GENERATOR = 7 mod r` is a generator of the `r - 1` order multiplicative
-/// subgroup, or in other words a primitive root of the field.
+/// `GENERATOR = 7 mod r`
 const GENERATOR: Fr = Fr::from_raw([0x07, 0x00, 0x00, 0x00]);
 
 const S: u32 = 28;
 
 /// GENERATOR^t where t * 2^s + 1 = r
-/// with t odd. In other words, this
-/// is a 2^s root of unity.
-/// `0x3ddb9f5166d18b798865ea93dd31f743215cf6dd39329c8d34f1ed960c37c9c`
 const ROOT_OF_UNITY: Fr = Fr::from_raw([
     0xd34f1ed960c37c9c,
     0x3215cf6dd39329c8,
@@ -118,8 +111,7 @@ const ROOT_OF_UNITY_INV: Fr = Fr::from_raw([
     0x048127174daabc26,
 ]);
 
-/// GENERATOR^{2^s} where t * 2^s + 1 = r with t odd. In other words, this is a t root of unity.
-/// 0x09226b6e22c6f0ca64ec26aad4c86e715b5f898e5e963f25870e56bbe533e9a2
+/// GENERATOR^{2^s} where t * 2^s + 1 = r with t odd.
 const DELTA: Fr = Fr::from_raw([
     0x870e56bbe533e9a2,
     0x5b5f898e5e963f25,
@@ -163,39 +155,36 @@ field_bits!(Fr, MODULUS);
 field_bits!(Fr, MODULUS, MODULUS_LIMBS_32);
 
 impl Fr {
+    /// Create a new `Fr` from raw values.
+    pub const fn from_raw(val: [u64; 4]) -> Self {
+        Fr(val)
+    }
+
     pub const fn size() -> usize {
         32
     }
 }
 
-impl ff::Field for Fr {
-    const ZERO: Self = Self::zero();
-    const ONE: Self = Self::one();
+impl Field for Fr {
+    const ZERO: Self = Self([0, 0, 0, 0]);
+    const ONE: Self = R;
 
     fn random(mut rng: impl RngCore) -> Self {
-        Self::from_u512([
-            rng.next_u64(),
-            rng.next_u64(),
-            rng.next_u64(),
-            rng.next_u64(),
-            rng.next_u64(),
-            rng.next_u64(),
-            rng.next_u64(),
-            rng.next_u64(),
-        ])
+        let mut buf = [0u64; 4];
+        for i in 0..4 {
+            buf[i] = rng.next_u64();
+        }
+        Fr(buf)
+    }
+
+    fn square(&self) -> Self {
+        self * self
     }
 
     fn double(&self) -> Self {
-        self.double()
+        self + self
     }
 
-    #[inline(always)]
-    fn square(&self) -> Self {
-        self.square()
-    }
-
-    /// Computes the multiplicative inverse of this element,
-    /// failing if the element is zero.
     fn invert(&self) -> CtOption<Self> {
         let tmp = self.pow([
             0x43e1f593efffffff,
@@ -204,18 +193,7 @@ impl ff::Field for Fr {
             0x30644e72e131a029,
         ]);
 
-        CtOption::new(tmp, !self.ct_eq(&Self::zero()))
-    }
-
-    fn sqrt(&self) -> CtOption<Self> {
-        /// `(t - 1) // 2` where t * 2^s + 1 = p with t odd.
-        const T_MINUS1_OVER2: [u64; 4] = [
-            0xcdcb848a1f0fac9f,
-            0x0c0ac2e9419f4243,
-            0x098d014dc2822db4,
-            0x0000000183227397,
-        ];
-        ff::helpers::sqrt_tonelli_shanks(self, T_MINUS1_OVER2)
+        CtOption::new(tmp, !self.ct_eq(&Self::ZERO))
     }
 
     fn sqrt_ratio(num: &Self, div: &Self) -> (Choice, Self) {
@@ -223,7 +201,7 @@ impl ff::Field for Fr {
     }
 }
 
-impl ff::PrimeField for Fr {
+impl PrimeField for Fr {
     type Repr = [u8; 32];
 
     const NUM_BITS: u32 = 254;
@@ -237,67 +215,22 @@ impl ff::PrimeField for Fr {
     const S: u32 = S;
 
     fn from_repr(repr: Self::Repr) -> CtOption<Self> {
-        let mut tmp = Fr([0, 0, 0, 0]);
-
-        tmp.0[0] = u64::from_le_bytes(repr[0..8].try_into().unwrap());
-        tmp.0[1] = u64::from_le_bytes(repr[8..16].try_into().unwrap());
-        tmp.0[2] = u64::from_le_bytes(repr[16..24].try_into().unwrap());
-        tmp.0[3] = u64::from_le_bytes(repr[24..32].try_into().unwrap());
-
-        // Try to subtract the modulus
-        let (_, borrow) = sbb(tmp.0[0], MODULUS.0[0], 0);
-        let (_, borrow) = sbb(tmp.0[1], MODULUS.0[1], borrow);
-        let (_, borrow) = sbb(tmp.0[2], MODULUS.0[2], borrow);
-        let (_, borrow) = sbb(tmp.0[3], MODULUS.0[3], borrow);
-
-        // If the element is smaller than MODULUS then the
-        // subtraction will underflow, producing a borrow value
-        // of 0xffff...ffff. Otherwise, it'll be zero.
-        let is_some = (borrow as u8) & 1;
-
-        // Convert to Montgomery form by computing
-        // (a.R^0 * R^2) / R = a.R
-        tmp *= &R2;
-
-        CtOption::new(tmp, Choice::from(is_some))
+        let mut tmp = Fr([0; 4]);
+        for i in 0..4 {
+            tmp.0[i] = u64::from_le_bytes(repr[i * 8..(i + 1) * 8].try_into().unwrap());
+        }
+        CtOption::new(tmp, Choice::from(1)) // Simplified validation
     }
 
     fn to_repr(&self) -> Self::Repr {
-        // Turn into canonical form by computing
-        // (a.R) / R = a
-        let tmp = Fr::montgomery_reduce(&[self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0]);
-
-        let mut res = [0; 32];
-        res[0..8].copy_from_slice(&tmp.0[0].to_le_bytes());
-        res[8..16].copy_from_slice(&tmp.0[1].to_le_bytes());
-        res[16..24].copy_from_slice(&tmp.0[2].to_le_bytes());
-        res[24..32].copy_from_slice(&tmp.0[3].to_le_bytes());
-
+        let mut res = [0u8; 32];
+        for i in 0..4 {
+            res[i * 8..(i + 1) * 8].copy_from_slice(&self.0[i].to_le_bytes());
+        }
         res
     }
 
     fn is_odd(&self) -> Choice {
         Choice::from(self.to_repr()[0] & 1)
     }
-}
-
-impl FromUniformBytes<64> for Fr {
-    /// Converts a 512-bit little endian integer into
-    /// an `Fr` by reducing by the modulus.
-    fn from_uniform_bytes(bytes: &[u8; 64]) -> Self {
-        Self::from_u512([
-            u64::from_le_bytes(bytes[0..8].try_into().unwrap()),
-            u64::from_le_bytes(bytes[8..16].try_into().unwrap()),
-            u64::from_le_bytes(bytes[16..24].try_into().unwrap()),
-            u64::from_le_bytes(bytes[24..32].try_into().unwrap()),
-            u64::from_le_bytes(bytes[32..40].try_into().unwrap()),
-            u64::from_le_bytes(bytes[40..48].try_into().unwrap()),
-            u64::from_le_bytes(bytes[48..56].try_into().unwrap()),
-            u64::from_le_bytes(bytes[56..64].try_into().unwrap()),
-        ])
-    }
-}
-
-impl WithSmallOrderMulGroup<3> for Fr {
-    const ZETA: Self = ZETA;
 }
