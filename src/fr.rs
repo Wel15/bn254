@@ -11,7 +11,7 @@ use crate::{
 };
 use core::convert::TryInto;
 use core::fmt;
-use core::ops::{Add, Mul, Neg, Sub, AddAssign, SubAssign, MulAssign};
+use core::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg};
 use ff::{Field, PrimeField, FromUniformBytes, WithSmallOrderMulGroup};
 use rand::RngCore;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
@@ -154,14 +154,93 @@ field_bits!(Fr, MODULUS);
 #[cfg(not(target_pointer_width = "64"))]
 field_bits!(Fr, MODULUS, MODULUS_LIMBS_32);
 
+/// Implementation of the `Fr` type.
 impl Fr {
-    /// Create a new `Fr` from raw values.
     pub const fn from_raw(val: [u64; 4]) -> Self {
         Fr(val)
     }
 
     pub const fn size() -> usize {
         32
+    }
+}
+
+/// Implement arithmetic traits for `Fr`
+impl Add for Fr {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut result = self;
+        for i in 0..4 {
+            result.0[i] = result.0[i].wrapping_add(rhs.0[i]);
+        }
+        result
+    }
+}
+
+impl AddAssign for Fr {
+    fn add_assign(&mut self, rhs: Self) {
+        for i in 0..4 {
+            self.0[i] = self.0[i].wrapping_add(rhs.0[i]);
+        }
+    }
+}
+
+impl Sub for Fr {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        let mut result = self;
+        for i in 0..4 {
+            result.0[i] = result.0[i].wrapping_sub(rhs.0[i]);
+        }
+        result
+    }
+}
+
+impl SubAssign for Fr {
+    fn sub_assign(&mut self, rhs: Self) {
+        for i in 0..4 {
+            self.0[i] = self.0[i].wrapping_sub(rhs.0[i]);
+        }
+    }
+}
+
+impl Mul for Fr {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut result = self;
+        for i in 0..4 {
+            result.0[i] = result.0[i].wrapping_mul(rhs.0[i]);
+        }
+        result
+    }
+}
+
+impl MulAssign for Fr {
+    fn mul_assign(&mut self, rhs: Self) {
+        for i in 0..4 {
+            self.0[i] = self.0[i].wrapping_mul(rhs.0[i]);
+        }
+    }
+}
+
+impl Neg for Fr {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        let mut result = Fr([0; 4]);
+        for i in 0..4 {
+            result.0[i] = self.0[i].wrapping_neg();
+        }
+        result
+    }
+}
+
+impl From<u64> for Fr {
+    fn from(val: u64) -> Self {
+        Fr([val, 0, 0, 0]) * R2 // 转换到 Montgomery 表示
     }
 }
 
@@ -178,11 +257,11 @@ impl Field for Fr {
     }
 
     fn square(&self) -> Self {
-        self * self
+        *self * *self
     }
 
     fn double(&self) -> Self {
-        self + self
+        *self + *self
     }
 
     fn invert(&self) -> CtOption<Self> {
@@ -219,7 +298,7 @@ impl PrimeField for Fr {
         for i in 0..4 {
             tmp.0[i] = u64::from_le_bytes(repr[i * 8..(i + 1) * 8].try_into().unwrap());
         }
-        CtOption::new(tmp, Choice::from(1)) // Simplified validation
+        CtOption::new(tmp, Choice::from(1)) // 校验简化
     }
 
     fn to_repr(&self) -> Self::Repr {
