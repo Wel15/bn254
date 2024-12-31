@@ -1,5 +1,6 @@
 use core::convert::TryInto;
-use core::ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Neg};
+use core::iter::{Product, Sum};
+use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use ff::{Field, PrimeField};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 
@@ -147,6 +148,17 @@ impl MulAssign for Fr {
     }
 }
 
+// 实现 Neg
+impl Neg for Fr {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        let mut result = MODULUS;
+        result -= &self;
+        result
+    }
+}
+
 // 常量时间比较
 impl ConstantTimeEq for Fr {
     fn ct_eq(&self, other: &Self) -> Choice {
@@ -166,6 +178,32 @@ impl ConditionallySelectable for Fr {
             result[i] = u64::conditional_select(&a.0[i], &b.0[i], choice);
         }
         Fr(result)
+    }
+}
+
+// 实现 Sum
+impl<'a> Sum<&'a Fr> for Fr {
+    fn sum<I: Iterator<Item = &'a Fr>>(iter: I) -> Self {
+        iter.fold(Fr::ZERO, |acc, x| acc + x)
+    }
+}
+
+impl Sum for Fr {
+    fn sum<I: Iterator<Item = Fr>>(iter: I) -> Self {
+        iter.fold(Fr::ZERO, |acc, x| acc + x)
+    }
+}
+
+// 实现 Product
+impl<'a> Product<&'a Fr> for Fr {
+    fn product<I: Iterator<Item = &'a Fr>>(iter: I) -> Self {
+        iter.fold(Fr::ONE, |acc, x| acc * x)
+    }
+}
+
+impl Product for Fr {
+    fn product<I: Iterator<Item = Fr>>(iter: I) -> Self {
+        iter.fold(Fr::ONE, |acc, x| acc * x)
     }
 }
 
