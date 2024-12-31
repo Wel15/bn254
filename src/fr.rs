@@ -43,7 +43,7 @@ impl Fr {
     }
 }
 
-// 运算符实现
+// 运算符实现（对引用类型的操作）
 impl<'a> Add<&'a Fr> for Fr {
     type Output = Self;
 
@@ -58,6 +58,24 @@ impl<'a> AddAssign<&'a Fr> for Fr {
     fn add_assign(&mut self, rhs: &'a Self) {
         for i in 0..4 {
             self.0[i] = self.0[i].wrapping_add(rhs.0[i]);
+        }
+    }
+}
+
+impl<'a> Sub<&'a Fr> for Fr {
+    type Output = Self;
+
+    fn sub(self, rhs: &'a Self) -> Self::Output {
+        let mut result = self;
+        result -= rhs;
+        result
+    }
+}
+
+impl<'a> SubAssign<&'a Fr> for Fr {
+    fn sub_assign(&mut self, rhs: &'a Self) {
+        for i in 0..4 {
+            self.0[i] = self.0[i].wrapping_sub(rhs.0[i]);
         }
     }
 }
@@ -77,6 +95,55 @@ impl<'a> MulAssign<&'a Fr> for Fr {
         for i in 0..4 {
             self.0[i] = self.0[i].wrapping_mul(rhs.0[i]);
         }
+    }
+}
+
+// 运算符实现（对非引用类型的操作，满足 `Field` trait 的要求）
+impl Add for Fr {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut result = self;
+        result += &rhs;
+        result
+    }
+}
+
+impl AddAssign for Fr {
+    fn add_assign(&mut self, rhs: Self) {
+        *self += &rhs;
+    }
+}
+
+impl Sub for Fr {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        let mut result = self;
+        result -= &rhs;
+        result
+    }
+}
+
+impl SubAssign for Fr {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self -= &rhs;
+    }
+}
+
+impl Mul for Fr {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut result = self;
+        result *= &rhs;
+        result
+    }
+}
+
+impl MulAssign for Fr {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self *= &rhs;
     }
 }
 
