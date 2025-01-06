@@ -114,16 +114,16 @@ impl Fr {
     }
 
     pub fn mul(&self, rhs: &Self) -> Fr {
-        let mut p = core::mem::MaybeUninit::<[u32; 8]>::uninit();
+        let mut p = [0u32; 8];
         unsafe {
-            memcpy32(&self.0, p.as_mut_ptr());
+            memcpy32(&self.0, &mut p);
             syscall_bn254_scalar_muladd(
-                p.as_mut_ptr(),
+                &mut p,
                 &self.0,
                 &rhs.0,
                 &Self::zero().0
             );
-            Fr(p.assume_init())
+            Fr(p)
         }
     }
 
@@ -132,16 +132,16 @@ impl Fr {
     }
 
     pub fn add(&self, rhs: &Self) -> Fr {
-        let mut p = core::mem::MaybeUninit::<Fr>::uninit();
+        let mut p = [0u32; 8];
         unsafe {
-            memcpy32(self, p.as_mut_ptr());
+            memcpy32(&self.0, &mut p);
             syscall_bn254_scalar_muladd(
-                p.as_mut_ptr(),
+                &mut p,
                 &rhs.0,
                 &ONE.0,
                 &self.0
             );
-            p.assume_init()
+            Fr(p)
         }
     }
 }
@@ -195,11 +195,11 @@ impl core::ops::MulAssign<Fr> for Fr {
 impl<'b> core::ops::MulAssign<&'b Fr> for Fr {
     #[inline]
     fn mul_assign(&mut self, rhs: &'b Fr) {
-        let tmp = *self;
+        let tmp = self.0;
         unsafe {
             syscall_bn254_scalar_muladd(
                 &mut self.0,
-                &tmp.0,
+                &tmp,
                 &rhs.0,
                 &Self::zero().0
             );
@@ -330,6 +330,10 @@ impl ConstantTimeEq for Fr {
             & self.0[1].ct_eq(&other.0[1])
             & self.0[2].ct_eq(&other.0[2])
             & self.0[3].ct_eq(&other.0[3])
+            & self.0[4].ct_eq(&other.0[4])
+            & self.0[5].ct_eq(&other.0[5])
+            & self.0[6].ct_eq(&other.0[6])
+            & self.0[7].ct_eq(&other.0[7])
     }
 }
 
@@ -385,7 +389,7 @@ impl<'a> Neg for &'a Fr {
 
     #[inline]
     fn neg(self) -> Fr {
-        unimplemented!()
+        todo!()
     }
 }
 
@@ -394,7 +398,7 @@ impl Neg for Fr {
 
     #[inline]
     fn neg(self) -> Fr {
-        unimplemented!()
+        -&self
     }
 }
 
