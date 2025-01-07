@@ -121,7 +121,6 @@ impl Fr {
                 &mut p,
                 &self.0,
                 &rhs.0,
-                &Self::zero().0
             );
             Fr(p)
         }
@@ -143,8 +142,7 @@ impl Fr {
             syscall_bn254_scalar_muladd(
                 &mut p,                  // ret = p
                 &rhs.0,                 // a = rhs
-                &ONE.0,                 // b = 1
-                &Self::zero().0         // c = 0
+                &ONE.0,                 // b = 1      
             );
             Fr(p)
         }
@@ -190,7 +188,7 @@ impl<'b> ::core::ops::AddAssign<&'b Fr> for Fr {
                 &mut self.0,      // ret = self
                 &rhs.0,          // a = rhs
                 &ONE.0,          // b = 1
-                &Self::zero().0  // c = 0
+              
             );
         }
     }
@@ -233,7 +231,7 @@ impl<'b> core::ops::MulAssign<&'b Fr> for Fr {
                 &mut self.0,    // ret = self(0)
                 &tmp.0,         // a = old_self
                 &rhs.0,        // b = rhs
-                &Self::zero().0 // c = 0
+               
             );
         }
     }
