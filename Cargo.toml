@@ -14,6 +14,7 @@ getrandom = { version = "0.2", features = ["custom"] }
 [target.'cfg(all(target_os = "zkvm", target_vendor = "succinct"))'.dependencies]
 sp1-intrinsics = { git = "https://github.com/Wel15/sp1-intrinsics.git", branch = "master" }
 
+
 [features]
 default = ["reexport", "bits"]
 asm = []

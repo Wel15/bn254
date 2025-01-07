@@ -127,23 +127,31 @@ impl Fr {
         }
     }
 
+  
+
+
     pub fn sub(&self, _rhs: &Self) -> Fr {
         todo!()
     }
 
+   
+
     pub fn add(&self, rhs: &Self) -> Fr {
         let mut p = [0u32; 8];
         unsafe {
-            memcpy32(&self.0, &mut p);
+            memcpy32(&self.0, &mut p);  // p = self
             syscall_bn254_scalar_muladd(
-                &mut p,
-                &rhs.0,
-                &ONE.0,
-                &self.0
+                &mut p,                  // ret = p
+                &rhs.0,                 // a = rhs
+                &ONE.0,                 // b = 1
+                &Self::zero().0         // c = 0
             );
             Fr(p)
         }
     }
+
+
+
 }
 
 impl_binops_additive_specify_output!(Fr, Fr, Fr);
@@ -173,17 +181,32 @@ impl ::core::ops::AddAssign<Fr> for Fr {
 
 impl<'b> ::core::ops::AddAssign<&'b Fr> for Fr {
     #[inline]
+   
+
+    
     fn add_assign(&mut self, rhs: &'b Fr) {
         unsafe {
             syscall_bn254_scalar_muladd(
-                &mut self.0,
-                &rhs.0,
-                &ONE.0,
-                &self.0
+                &mut self.0,      // ret = self
+                &rhs.0,          // a = rhs
+                &ONE.0,          // b = 1
+                &Self::zero().0  // c = 0
             );
         }
     }
+
+
+
+
+
+
+
+
 }
+
+
+
+
 
 impl core::ops::MulAssign<Fr> for Fr {
     #[inline]
@@ -194,18 +217,47 @@ impl core::ops::MulAssign<Fr> for Fr {
 
 impl<'b> core::ops::MulAssign<&'b Fr> for Fr {
     #[inline]
+    
+
     fn mul_assign(&mut self, rhs: &'b Fr) {
-        let tmp = self.0;
+        let mut tmp = Fr::zero();
         unsafe {
+            // 1. 保存self的值
+            memcpy32(&self.0, &mut tmp.0);
+            
+            // 2. 将self设为0
+            memcpy32(&Self::zero().0, &mut self.0);
+            
+            // 3. 使用muladd实现 self = tmp * rhs
             syscall_bn254_scalar_muladd(
-                &mut self.0,
-                &tmp,
-                &rhs.0,
-                &Self::zero().0
+                &mut self.0,    // ret = self(0)
+                &tmp.0,         // a = old_self
+                &rhs.0,        // b = rhs
+                &Self::zero().0 // c = 0
             );
         }
     }
+
+
+
+
+
+
+
+
+
+
 }
+
+
+
+
+
+
+
+
+
+
 
 impl ff::Field for Fr {
     const ZERO: Self = Self::zero();
