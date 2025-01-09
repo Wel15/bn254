@@ -6,7 +6,7 @@ use core::ops::{Add, Mul, Neg, Sub};
 use ff::{PrimeField, FromUniformBytes};
 use rand::RngCore;
 use sp1_intrinsics::{
-    bn254::syscall_bn254_scalar_muladd,
+    bn254::{syscall_bn254_scalar_mac, syscall_bn254_scalar_mul},
     memory::memcpy32,
 };
 use std::convert::TryInto;
@@ -25,30 +25,42 @@ const MODULUS: Fr = Fr([
 
 const MODULUS_STR: &str = "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001";
 
+/// `GENERATOR = 7 mod r` is a generator of the `r - 1` order multiplicative
+/// subgroup, or in other words a primitive root of the field.
 const GENERATOR: Fr = Fr([0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
 const S: u32 = 28;
 
+/// GENERATOR^t where t * 2^s + 1 = r
+/// with t odd. In other words, this
+/// is a 2^s root of unity.
+/// `0x3ddb9f5166d18b798865ea93dd31f743215cf6dd39329c8d34f1ed960c37c9c`
 const ROOT_OF_UNITY: Fr = Fr([
     0xd34f1ed9, 0x60c37c9c, 0x3215cf6d, 0xd39329c8, 0x98865ea9, 0x3dd31f74, 0x03ddb9f5, 0x166d18b7,
 ]);
 
+/// 1 / 2 mod r
 const TWO_INV: Fr = Fr([
     0xa1f0fac9, 0xf8000001, 0x9419f424, 0x3cdcb848, 0xdc2822db, 0x40c0ac2e, 0x18322739, 0x7098d014,
 ]);
 
+/// 1 / ROOT_OF_UNITY mod r
 const ROOT_OF_UNITY_INV: Fr = Fr([
     0x0ed3e50a, 0x414e6dba, 0xb22625f5, 0x9115aba7, 0x1bbe5871, 0x80f34361, 0x04812717, 0x4daabc26,
 ]);
 
+/// GENERATOR^{2^s} where t * 2^s + 1 = r with t odd. In other words, this is a t root of unity.
+/// 0x09226b6e22c6f0ca64ec26aad4c86e715b5f898e5e963f25870e56bbe533e9a2
 const DELTA: Fr = Fr([
     0x870e56bb, 0xe533e9a2, 0x5b5f898e, 0x5e963f25, 0x64ec26aa, 0xd4c86e71, 0x09226b6e, 0x22c6f0ca,
 ]);
 
+/// `ZETA^3 = 1 mod r` where `ZETA^2 != 1 mod r`
 const ZETA: Fr = Fr([
     0x8b17ea66, 0xb99c90dd, 0x5bfc4108, 0x8d8daaa7, 0xb3c4d79d, 0x41a91758, 0x00, 0x00,
 ]);
 
+/// Compute a - (b + borrow), returning the result and the new borrow.
 #[inline(always)]
 pub(crate) const fn sbb_u32(a: u32, b: u32, borrow: u32) -> (u32, u32) {
     let ret = (a as u64).wrapping_sub((b as u64) + ((borrow >> 31) as u64));
@@ -95,6 +107,7 @@ impl Fr {
     }
 
     pub const fn from_raw(limbs: [u64; 4]) -> Fr {
+        // FIXME: handle limbs that are larger than modulus.
         let mut tmp = [0, 0, 0, 0, 0, 0, 0, 0];
 
         tmp[0] = (limbs[0] & 0xffffffff) as u32;
@@ -114,42 +127,29 @@ impl Fr {
     }
 
     pub fn mul(&self, rhs: &Self) -> Fr {
-        let mut p = [0u32; 8];
+        let mut p = core::mem::MaybeUninit::<[u32; 8]>::uninit();
         unsafe {
-            memcpy32(&self.0, &mut p);
-            syscall_bn254_scalar_muladd(
-                &mut p,
-                &self.0,
-                &rhs.0,
-            );
-            Fr(p)
+            memcpy32(&self.0, p.as_mut_ptr());
+            syscall_bn254_scalar_mul(p.as_mut_ptr(), &rhs.0);
+            Fr(p.assume_init())
         }
     }
-
-  
-
 
     pub fn sub(&self, _rhs: &Self) -> Fr {
         todo!()
     }
 
-   
-
     pub fn add(&self, rhs: &Self) -> Fr {
-        let mut p = [0u32; 8];
+        let mut p = core::mem::MaybeUninit::<Fr>::uninit();
+        // # Safety
+        // * Self, rhs are a valid pointer to Fr.
+        // * p is initialized before calling syscall_bn254_scalar_mac.
         unsafe {
-            memcpy32(&self.0, &mut p);  // p = self
-            syscall_bn254_scalar_muladd(
-                &mut p,                  // ret = p
-                &rhs.0,                 // a = rhs
-                &ONE.0,                 // b = 1      
-            );
-            Fr(p)
+            memcpy32(self, p.as_mut_ptr());
+            syscall_bn254_scalar_mac(p.as_mut_ptr(), &rhs.0, &ONE.0);
+            p.assume_init()
         }
     }
-
-
-
 }
 
 impl_binops_additive_specify_output!(Fr, Fr, Fr);
@@ -179,32 +179,14 @@ impl ::core::ops::AddAssign<Fr> for Fr {
 
 impl<'b> ::core::ops::AddAssign<&'b Fr> for Fr {
     #[inline]
-   
-
-    
     fn add_assign(&mut self, rhs: &'b Fr) {
+        // # Safety
+        // Self and rhs are valid pointers to Fr.
         unsafe {
-            syscall_bn254_scalar_muladd(
-                &mut self.0,      // ret = self
-                &rhs.0,          // a = rhs
-                &ONE.0,          // b = 1
-              
-            );
+            syscall_bn254_scalar_mac(&mut self.0, &rhs.0, &ONE.0);
         }
     }
-
-
-
-
-
-
-
-
 }
-
-
-
-
 
 impl core::ops::MulAssign<Fr> for Fr {
     #[inline]
@@ -215,47 +197,14 @@ impl core::ops::MulAssign<Fr> for Fr {
 
 impl<'b> core::ops::MulAssign<&'b Fr> for Fr {
     #[inline]
-    
-
     fn mul_assign(&mut self, rhs: &'b Fr) {
-        let mut tmp = Fr::zero();
+        // # Safety
+        // Self and rhs are valid pointers to Fr.
         unsafe {
-            // 1. 保存self的值
-            memcpy32(&self.0, &mut tmp.0);
-            
-            // 2. 将self设为0
-            memcpy32(&Self::zero().0, &mut self.0);
-            
-            // 3. 使用muladd实现 self = tmp * rhs
-            syscall_bn254_scalar_muladd(
-                &mut self.0,    // ret = self(0)
-                &tmp.0,         // a = old_self
-                &rhs.0,        // b = rhs
-               
-            );
+            syscall_bn254_scalar_mul(&mut self.0, &rhs.0);
         }
     }
-
-
-
-
-
-
-
-
-
-
 }
-
-
-
-
-
-
-
-
-
-
 
 impl ff::Field for Fr {
     const ZERO: Self = Self::zero();
@@ -380,10 +329,6 @@ impl ConstantTimeEq for Fr {
             & self.0[1].ct_eq(&other.0[1])
             & self.0[2].ct_eq(&other.0[2])
             & self.0[3].ct_eq(&other.0[3])
-            & self.0[4].ct_eq(&other.0[4])
-            & self.0[5].ct_eq(&other.0[5])
-            & self.0[6].ct_eq(&other.0[6])
-            & self.0[7].ct_eq(&other.0[7])
     }
 }
 
@@ -439,7 +384,7 @@ impl<'a> Neg for &'a Fr {
 
     #[inline]
     fn neg(self) -> Fr {
-        todo!()
+        unimplemented!()
     }
 }
 
@@ -448,7 +393,7 @@ impl Neg for Fr {
 
     #[inline]
     fn neg(self) -> Fr {
-        -&self
+        unimplemented!()
     }
 }
 
