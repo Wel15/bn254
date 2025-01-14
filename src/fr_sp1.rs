@@ -89,7 +89,7 @@ impl Fr {
                 syscall_bn254_scalar_mul(ptr, self);
                 memcpy32(ptr, self);
                 memcpy32(ptr, square.as_mut_ptr());
-                syscall_bn254_scalar_mac(square.as_mut_ptr(), &self.0, &self.0);
+                syscall_bn254_scalar_mac(square.as_mut_ptr(), &ONE.0, &ONE.0);
 
         }
 
