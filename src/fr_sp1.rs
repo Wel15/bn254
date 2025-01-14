@@ -77,7 +77,9 @@ impl Fr {
     pub fn apply_sbox(&mut self){
         
         let mut a = core::mem::MaybeUninit::<Fr>::uninit();
-        
+        let mut square = core::mem::MaybeUninit::<Fr>::uninit();
+        let mut cube = core::mem::MaybeUninit::<Fr>::uninit();
+        let mut result = core::mem::MaybeUninit::<Fr>::uninit();
         unsafe {
                 let ptr = a.as_mut_ptr();
                 memcpy32(self, ptr);
@@ -86,7 +88,8 @@ impl Fr {
                 syscall_bn254_scalar_mul(ptr, self);
                 syscall_bn254_scalar_mul(ptr, self);
                 memcpy32(ptr, self);
-            
+                syscall_bn254_scalar_mac(square.as_mut_ptr(), &self.0, &self.0);
+
         }
 
 
