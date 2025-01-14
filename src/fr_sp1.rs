@@ -72,7 +72,7 @@ static ONE: Fr = Fr::one();
 impl Fr {
 
     #[inline]
-    pub(crate) fn as_inner(&self) -> &[u32; 8] {
+    pub fn as_inner(&self) -> &[u32; 8] {
         &self.0
     }
 
