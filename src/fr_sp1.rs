@@ -70,6 +70,12 @@ pub(crate) const fn sbb_u32(a: u32, b: u32, borrow: u32) -> (u32, u32) {
 static ONE: Fr = Fr::one();
 
 impl Fr {
+
+    #[inline]
+    pub(crate) fn as_inner(&self) -> &[u32; 8] {
+        &self.0
+    }
+
     #[inline]
     pub const fn zero() -> Self {
         Fr([0, 0, 0, 0, 0, 0, 0, 0])
