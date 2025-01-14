@@ -76,7 +76,7 @@ impl Fr {
     #[inline]
     pub fn apply_sbox(&mut self){
         
-        let mut a = MaybeUninit::<Fr>::uninit();
+        let mut a = core::mem::MaybeUninit::<Fr>::uninit();
         
         unsafe {
                 let ptr = a.as_mut_ptr();
