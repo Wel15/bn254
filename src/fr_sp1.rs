@@ -71,10 +71,31 @@ static ONE: Fr = Fr::one();
 
 impl Fr {
 
+   
+
     #[inline]
-    pub fn as_inner(&self) -> &[u32; 8] {
-        &self.0
+    pub fn apply_sbox(&mut self){
+        
+        let mut a = MaybeUninit::<Fr>::uninit();
+        
+        unsafe {
+                let ptr = a.as_mut_ptr();
+                memcpy32(self, ptr);
+                syscall_bn254_scalar_mul(ptr, val);
+                syscall_bn254_scalar_mul(ptr, val);
+                syscall_bn254_scalar_mul(ptr, val);
+                syscall_bn254_scalar_mul(ptr, val);
+                memcpy32(ptr, val);
+            
+        }
+
+
+
+
     }
+
+
+
 
     #[inline]
     pub const fn zero() -> Self {
