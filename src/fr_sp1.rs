@@ -83,13 +83,13 @@ impl Fr {
         unsafe {
                 let ptr = a.as_mut_ptr();
                 memcpy32(self, ptr);
-                syscall_bn254_scalar_mul(ptr, self);
-                syscall_bn254_scalar_mul(ptr, self);
-                syscall_bn254_scalar_mul(ptr, self);
-                syscall_bn254_scalar_mul(ptr, self);
-                memcpy32(ptr, self);
-                memcpy32(ptr, square.as_mut_ptr());
-                syscall_bn254_scalar_mac(square.as_mut_ptr(), &ONE.0, &ONE.0);
+               // syscall_bn254_scalar_mul(ptr, self);
+                //syscall_bn254_scalar_mul(ptr, self);
+                //syscall_bn254_scalar_mul(ptr, self);
+                //syscall_bn254_scalar_mul(ptr, self);
+                //memcpy32(ptr, self);
+                //memcpy32(ptr, square.as_mut_ptr());
+                syscall_bn254_scalar_mac(ptr, &ONE.0, &ONE.0);
 
         }
 
