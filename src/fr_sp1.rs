@@ -169,30 +169,26 @@ impl Fr {
 
     pub fn mul(&self, rhs: &Self) -> Fr {
         let mut p = core::mem::MaybeUninit::<[u32; 8]>::uninit();
-
-        let mut q = core::mem::MaybeUninit::<[u32;8]>::uninit();
-        
+        let mut q = core::mem::MaybeUninit::<[u32; 8]>::uninit();
+    
         let zero = Fr::zero();
         unsafe {
-
-            let qtr = q.as_mut_ptr();
-            let ptr = p.as_mut_ptr();
-            memcpy32(&zero, qtr);
-
-
-
+            let qtr = q.as_mut_ptr(); // 指向 q 的指针
+            let ptr = p.as_mut_ptr(); // 指向 p 的指针
+    
+            // 初始化 q 为零值
+            memcpy32(&zero, qtr as *mut Fr);
+    
+            // 将 self 的值复制到 p
             memcpy32(&self.0, ptr);
-
-           // syscall_bn254_scalar_mul(p.as_mut_ptr(), &rhs.0);
-            
-            
-            syscall_bn254_scalar_mac(qtr, &rhs.0, ptr as *const Fr);
-            
-            
+    
+            // 使用 syscall_bn254_scalar_mac 进行乘法累加
+            syscall_bn254_scalar_mac(qtr, &rhs.0, ptr as *const [u32; 8]);
+    
+            // 返回结果
             Fr(q.assume_init())
         }
     }
-
 
 
 
