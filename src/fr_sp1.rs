@@ -6,7 +6,7 @@ use core::ops::{Add, Mul, Neg, Sub};
 use ff::{PrimeField, FromUniformBytes};
 use rand::RngCore;
 use sp1_intrinsics::{
-    bn254::{syscall_bn254_scalar_mac},
+    bn254::{syscall_bn254_scalar_muladd},
     memory::memcpy32,
 };
 use std::convert::TryInto;
@@ -73,30 +73,30 @@ impl Fr {
 
    
 
-    #[inline]
-    pub fn apply_sbox(&mut self){
+    // #[inline]
+    // pub fn apply_sbox(&mut self){
         
-        let mut a = core::mem::MaybeUninit::<Fr>::uninit();
-        let mut square = core::mem::MaybeUninit::<Fr>::uninit();
-        let mut cube = core::mem::MaybeUninit::<Fr>::uninit();
-        let mut result = core::mem::MaybeUninit::<Fr>::uninit();
-        unsafe {
-                let ptr = a.as_mut_ptr();
-                memcpy32(self, ptr);
-               // syscall_bn254_scalar_mul(ptr, self);
-                //syscall_bn254_scalar_mul(ptr, self);
-                //syscall_bn254_scalar_mul(ptr, self);
-                //syscall_bn254_scalar_mul(ptr, self);
-                //memcpy32(ptr, self);
-                //memcpy32(ptr, square.as_mut_ptr());
-                syscall_bn254_scalar_mac(ptr, &ONE.0, &ONE.0);
+    //     let mut a = core::mem::MaybeUninit::<Fr>::uninit();
+    //     let mut square = core::mem::MaybeUninit::<Fr>::uninit();
+    //     let mut cube = core::mem::MaybeUninit::<Fr>::uninit();
+    //     let mut result = core::mem::MaybeUninit::<Fr>::uninit();
+    //     unsafe {
+    //             let ptr = a.as_mut_ptr();
+    //             memcpy32(self, ptr);
+    //            // syscall_bn254_scalar_mul(ptr, self);
+    //             //syscall_bn254_scalar_mul(ptr, self);
+    //             //syscall_bn254_scalar_mul(ptr, self);
+    //             //syscall_bn254_scalar_mul(ptr, self);
+    //             //memcpy32(ptr, self);
+    //             //memcpy32(ptr, square.as_mut_ptr());
+    //             syscall_bn254_scalar_mac(ptr, &ONE.0, &ONE.0);
 
-        }
-
-
+    //     }
 
 
-    }
+
+
+    // }
 
 
 
@@ -183,7 +183,7 @@ impl Fr {
             memcpy32(&self.0, ptr);
     
             // 使用 syscall_bn254_scalar_mac 进行乘法累加
-            syscall_bn254_scalar_mac(qtr, &rhs.0, ptr as *const [u32; 8]);
+            syscall_bn254_scalar_muladd(qtr, &rhs.0, ptr as *const [u32; 8]);
     
             // 返回结果
             Fr(q.assume_init())
@@ -206,7 +206,7 @@ impl Fr {
         // * p is initialized before calling syscall_bn254_scalar_mac.
         unsafe {
             memcpy32(self, p.as_mut_ptr());
-            syscall_bn254_scalar_mac(p.as_mut_ptr(), &rhs.0, &ONE.0);
+            syscall_bn254_scalar_muladd(p.as_mut_ptr(), &rhs.0, &ONE.0);
             p.assume_init()
         }
     }
@@ -243,7 +243,7 @@ impl<'b> ::core::ops::AddAssign<&'b Fr> for Fr {
         // # Safety
         // Self and rhs are valid pointers to Fr.
         unsafe {
-            syscall_bn254_scalar_mac(&mut self.0, &rhs.0, &ONE.0);
+            syscall_bn254_scalar_muladd(&mut self.0, &rhs.0, &ONE.0);
         }
     }
 }
@@ -287,7 +287,7 @@ impl<'b> core::ops::MulAssign<&'b Fr> for Fr {
             memcpy32(&zero, &mut self.0 as *mut [u32; 8] as *mut Fr);
 
             // 执行乘法累加：self.0 += rhs.0 * temp
-            syscall_bn254_scalar_mac(&mut self.0, &rhs.0, temp.as_ptr() as *const [u32; 8]);
+            syscall_bn254_scalar_muladd(&mut self.0, &rhs.0, temp.as_ptr() as *const [u32; 8]);
         }
     }
 }
