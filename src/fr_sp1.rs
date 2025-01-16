@@ -6,7 +6,7 @@ use core::ops::{Add, Mul, Neg, Sub};
 use ff::{PrimeField, FromUniformBytes};
 use rand::RngCore;
 use sp1_intrinsics::{
-    bn254::{syscall_bn254_scalar_mac, syscall_bn254_scalar_mul},
+    bn254::{syscall_bn254_scalar_mac},
     memory::memcpy32,
 };
 use std::convert::TryInto;
