@@ -157,14 +157,47 @@ impl Fr {
         32
     }
 
+    // pub fn mul(&self, rhs: &Self) -> Fr {
+    //     let mut p = core::mem::MaybeUninit::<[u32; 8]>::uninit();
+    //     unsafe {
+    //         memcpy32(&self.0, p.as_mut_ptr());
+    //         syscall_bn254_scalar_mul(p.as_mut_ptr(), &rhs.0);
+    //         Fr(p.assume_init())
+    //     }
+    // }
+
+
     pub fn mul(&self, rhs: &Self) -> Fr {
         let mut p = core::mem::MaybeUninit::<[u32; 8]>::uninit();
+
+        let mut q = core::mem::MaybeUninit::<Fr>::uninit();
+        
+        let zero = Fr::zero();
         unsafe {
-            memcpy32(&self.0, p.as_mut_ptr());
-            syscall_bn254_scalar_mul(p.as_mut_ptr(), &rhs.0);
-            Fr(p.assume_init())
+
+            let qtr = q.as_mut_ptr();
+            let ptr = p.as_mut_ptr();
+            memcpy32(&zero, qtr);
+
+
+
+            memcpy32(&self.0, ptr);
+
+           // syscall_bn254_scalar_mul(p.as_mut_ptr(), &rhs.0);
+            
+            
+            syscall_bn254_scalar_mac(qtr, ptr as *const Fr, &rhs.0);
+            
+            
+            Fr(q.assume_init())
         }
     }
+
+
+
+
+
+
 
     pub fn sub(&self, _rhs: &Self) -> Fr {
         todo!()
