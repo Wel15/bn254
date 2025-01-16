@@ -170,7 +170,7 @@ impl Fr {
     pub fn mul(&self, rhs: &Self) -> Fr {
         let mut p = core::mem::MaybeUninit::<[u32; 8]>::uninit();
 
-        let mut q = core::mem::MaybeUninit::<Fr>::uninit();
+        let mut q = core::mem::MaybeUninit::<[u32;8]>::uninit();
         
         let zero = Fr::zero();
         unsafe {
@@ -186,7 +186,7 @@ impl Fr {
            // syscall_bn254_scalar_mul(p.as_mut_ptr(), &rhs.0);
             
             
-            syscall_bn254_scalar_mac(qtr, ptr as *const Fr, &rhs.0);
+            syscall_bn254_scalar_mac(qtr, &rhs.0, ptr as *const Fr);
             
             
             Fr(q.assume_init())
