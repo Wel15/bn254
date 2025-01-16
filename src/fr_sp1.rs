@@ -284,7 +284,7 @@ impl<'b> core::ops::MulAssign<&'b Fr> for Fr {
             //syscall_bn254_scalar_mac(&mut self.0, &zero.0, &zero.0);
 
 
-            memcpy32(&zero, &mut self.0);
+            memcpy32(&zero, &mut self.0 as *mut [u32; 8] as *mut Fr);
 
             // 执行乘法累加：self.0 += rhs.0 * temp
             syscall_bn254_scalar_mac(&mut self.0, &rhs.0, temp.as_ptr() as *const [u32; 8]);
