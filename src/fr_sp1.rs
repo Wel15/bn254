@@ -255,16 +255,55 @@ impl core::ops::MulAssign<Fr> for Fr {
     }
 }
 
+// impl<'b> core::ops::MulAssign<&'b Fr> for Fr {
+//     #[inline]
+//     fn mul_assign(&mut self, rhs: &'b Fr) {
+//         // # Safety
+//         // Self and rhs are valid pointers to Fr.
+//         unsafe {
+//             syscall_bn254_scalar_mul(&mut self.0, &rhs.0);
+//         }
+//     }
+// }
+
+
+
 impl<'b> core::ops::MulAssign<&'b Fr> for Fr {
     #[inline]
     fn mul_assign(&mut self, rhs: &'b Fr) {
         // # Safety
         // Self and rhs are valid pointers to Fr.
         unsafe {
-            syscall_bn254_scalar_mul(&mut self.0, &rhs.0);
+            let zero = Fr::zero(); // 初始化为零
+            let mut temp = core::mem::MaybeUninit::<[u32; 8]>::uninit(); // 临时存储
+
+            // 将 self 的值复制到临时缓冲区
+            memcpy32(&self.0, temp.as_mut_ptr());
+
+            // 将 self 初始化为零
+            //syscall_bn254_scalar_mac(&mut self.0, &zero.0, &zero.0);
+
+
+            memcpy32(&zero, &self.0)
+
+            // 执行乘法累加：self.0 += rhs.0 * temp
+            syscall_bn254_scalar_mac(&mut self.0, &rhs.0, temp.as_ptr() as *const [u32; 8]);
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 impl ff::Field for Fr {
     const ZERO: Self = Self::zero();
